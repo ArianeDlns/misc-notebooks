@@ -1,0 +1,82 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+library(tidyverse) #includes dplyr for data manipulation and ggplot2 for plotting
+library(mapproj)
+library(rgdal) #Import Map onto ggplot2
+library(leaflet)
+library(readxl)
+library(network)
+library("RColorBrewer")
+```
+
+```{r}
+data <- read_excel('Network.xlsx',sheet=1);
+nodes <- cbind(rbind(data[1],"me"),rbind(data[4],"Ingé"));
+route <- cbind(data[1],data[2]);
+route <- unname(route);
+
+for (i in 1:nrow(nodes)){ 
+  route  <-  rbind(route,c(nodes[i,1],"me"))
+}
+
+route <- unique(route)
+names(route)[1] <- "People"
+names(route)[2] <- "Connect"
+
+nodes <- nodes %>% rowid_to_column("id")
+
+edges <- route %>% 
+  left_join(nodes, by = c("People" = "Contact")) %>% 
+  rename(from = id)
+
+edges <- edges %>% 
+  left_join(nodes, by = c("Connect" = "Contact")) %>% 
+  rename(to = id)  
+
+names(nodes)[2] <- "label"
+
+edges <- select(edges, from, to)
+```
+
+```{r}
+library(network)
+routes_network <- network(edges, vertex.attr = nodes, matrix.type = "edgelist", ignore.eval = FALSE)
+
+plot(routes_network, vertex.cex = 3)
+```
+```{r}
+detach(package:network)
+rm(routes_network)
+library(igraph)
+```
+https://kateto.net/netscix2016.html
+
+```{r}
+routes_igraph <- graph_from_data_frame(d = edges, vertices = nodes, directed = TRUE)
+
+colrs <- brewer.pal(n = 8, name = "YlOrRd")
+
+V(routes_igraph)$color <- colrs[as.numeric(factor(V(routes_igraph)$Type))]
+
+plot(routes_igraph, layout = layout_with_graphopt, edge.arrow.size = 0.2, vertex.size = 8, vertex.label.cex=1,edge.curved=.1,vertex.size=7, vertex.label.dist=2)
+
+legend("topleft",bty = "n",
+       legend=sort(unique(V(routes_igraph)$Type)),
+       fill=sort(unique(V(routes_igraph)$color),decreasing = TRUE), border=NA)
+
+
+```
+
+```{r}
+library(visNetwork)
+library(networkD3)
+
+visNetwork(nodes, edges)
+```
+
